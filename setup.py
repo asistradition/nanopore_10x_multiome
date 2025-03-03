@@ -19,7 +19,8 @@ setup(
       'pandas',
       'joblib',
       'parasail',
-      'regex'
+      'regex',
+      'tqdm'
     ],
     zip_safe=True,
     classifiers=[

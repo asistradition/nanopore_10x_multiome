@@ -2,6 +2,7 @@ import itertools
 
 import numpy as np
 import joblib
+import tqdm
 
 from nanopore_10x_multiome.utils import (
     fastqProcessor,
@@ -47,7 +48,8 @@ def split_multiome_preamp_fastq(
     other_file_name,
     atac_technical_file_name=None,
     n_records=None,
-    n_jobs=None
+    n_jobs=None,
+    progress_bar=False
 ):
     """
     Split a 10x multiome pre-amp FASTQ file into ATAC, GEX and other reads.
@@ -84,13 +86,32 @@ def split_multiome_preamp_fastq(
     if atac_technical_file_name is None:
         atac_technical_file_name = itertools.repeat(None)
 
+    (
+        gex_barcodes,
+        atac_barcodes,
+        gex_correction_table,
+        atac_correction_table,
+        atac_gex_translation_table
+    ) = _load_missing_multiome_barcode_info()
+
+    if progress_bar:
+        iterer = tqdm.tqdm
+    else:
+        def iterer(x, **kwargs):
+            return iter(x)
+
     return np.stack([
         r
-        for r in joblib.Parallel(n_jobs=n_jobs)(
+        for r in iterer(joblib.Parallel(n_jobs=n_jobs)(
             joblib.delayed(_split_multiome_preamp_fastq)(
                 *files,
-                n_records=n_records
-            )
+                n_records=n_records,
+                gex_barcodes=gex_barcodes,
+                atac_barcodes=atac_barcodes,
+                gex_correction_table=gex_correction_table,
+                atac_correction_table=atac_correction_table,
+                atac_gex_translation_table=atac_gex_translation_table
+        )
             for files in zip(
                 in_file_name,
                 atac_file_name,
@@ -98,8 +119,9 @@ def split_multiome_preamp_fastq(
                 other_file_name,
                 atac_technical_file_name
             )
-        )
-    ])
+        ),
+        total=len(in_file_name)
+    )])
 
 
 def _split_multiome_preamp_fastq(
@@ -108,7 +130,12 @@ def _split_multiome_preamp_fastq(
     gex_file_name,
     other_file_name,
     atac_technical_file_name=None,
-    n_records=None
+    n_records=None,
+    gex_barcodes=None,
+    atac_barcodes=None,
+    gex_correction_table=None,
+    atac_correction_table=None,
+    atac_gex_translation_table=None
 ):
     """
     Split a 10x multiome pre-amp FASTQ file into ATAC, GEX and other reads.
@@ -131,14 +158,18 @@ def _split_multiome_preamp_fastq(
     
     result_counts = np.zeros(3, dtype=int)
 
-    gex_barcodes = load_gex_barcodes()
-    atac_barcodes = load_atac_barcodes()
-
-    gex_correction_table = barcode_correction_table(gex_barcodes)
-    atac_correction_table = barcode_correction_table(atac_barcodes)
-    atac_gex_translation_table = load_translations(
+    (
+        gex_barcodes,
         atac_barcodes,
-        gex_barcodes
+        gex_correction_table,
+        atac_correction_table,
+        atac_gex_translation_table
+    ) = _load_missing_multiome_barcode_info(
+        gex_barcodes,
+        atac_barcodes,
+        gex_correction_table,
+        atac_correction_table,
+        atac_gex_translation_table
     )
 
     processor = fastqProcessor(
@@ -197,7 +228,7 @@ def _split_multiome_preamp_fastq(
                     continue
 
                 # Check for GEX anchors
-                _bc, _umi, gex_locs = get_gex_anchors(s)
+                _bc, _umi, gex_locs = get_gex_anchors(s, q)
 
                 if _bc is not None:
                     write_record(
@@ -230,3 +261,38 @@ def _split_multiome_preamp_fastq(
                 atac_tech_fh.close()
 
     return result_counts
+
+
+def _load_missing_multiome_barcode_info(
+    gex_barcodes=None,
+    atac_barcodes=None,
+    gex_correction_table=None,
+    atac_correction_table=None,
+    atac_gex_translation_table=None
+):
+    
+    if gex_barcodes is None:
+        gex_barcodes = load_gex_barcodes()
+
+    if atac_barcodes is None:
+        atac_barcodes = load_atac_barcodes()
+
+    if gex_correction_table is None:
+        gex_correction_table = barcode_correction_table(gex_barcodes)
+
+    if atac_correction_table is None:
+        atac_correction_table = barcode_correction_table(atac_barcodes)
+
+    if atac_gex_translation_table is None:
+        atac_gex_translation_table = load_translations(
+            atac_barcodes,
+            gex_barcodes
+        )
+
+    return (
+        gex_barcodes,
+        atac_barcodes,
+        gex_correction_table,
+        atac_correction_table,
+        atac_gex_translation_table
+    )

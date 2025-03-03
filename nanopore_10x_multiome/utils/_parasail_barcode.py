@@ -40,7 +40,6 @@ def get_barcode_parasail(
     _bc = compiled_regex.search(seq)
 
     if _bc is None:
-        print("Negative Regex")
         return None, None, None
 
     _span = _bc.span()
