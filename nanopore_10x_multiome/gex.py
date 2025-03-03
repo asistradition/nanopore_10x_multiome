@@ -15,7 +15,7 @@ from nanopore_10x_multiome.barcodes import correct_barcode
 # ATAC and GEX barcodes are not the same - use translation table!
 ###############################################################################
 
-TENX_GEX_ADAPTER = 'ACACTCTTTCCCTACACGACGCTCTTCCGATCTNNNNNNNNNNNNNNNNNNNNNNNNNNNNNTTT'
+TENX_GEX_ADAPTER = 'ACACTCTTTCCCTACACGACGCTCTTCCGATCTNNNNNNNNNNNNNNNNNNNNNNNNNNNNTTT'
 
 
 gex_re = regex.compile(
@@ -65,7 +65,7 @@ def get_gex_anchors(
         return None, None, None
     
     barcode = _bc[0:bc_len], _bc_qual[0:bc_len]
-    umi = _bc[bc_len:bc_umi_len], _bc_qual[bc_len:bc_umi_len]
+    umi = _bc[bc_len:], _bc_qual[bc_len:]
 
     return barcode, umi, _seq_loc
 
