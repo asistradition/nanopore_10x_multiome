@@ -1,14 +1,24 @@
-import numpy as np
+import itertools
 
-from nanopore_10x_multiome.utils import fastqProcessor
-from nanopore_10x_multiome.atac import get_atac_anchors
-from nanopore_10x_multiome.gex import get_gex_anchors
+import numpy as np
+import joblib
+
+from nanopore_10x_multiome.utils import (
+    fastqProcessor,
+    write_record
+)
+from nanopore_10x_multiome.atac import (
+    get_atac_anchors,
+    process_atac_header
+)
+from nanopore_10x_multiome.gex import (
+    get_gex_anchors,
+    process_gex_header
+)
 from nanopore_10x_multiome.barcodes import (
-    translate_barcode,
     load_gex_barcodes,
     load_atac_barcodes,
     load_translations,
-    correct_barcode,
     barcode_correction_table
 )
 
@@ -36,9 +46,89 @@ def split_multiome_preamp_fastq(
     gex_file_name,
     other_file_name,
     atac_technical_file_name=None,
+    n_records=None,
+    n_jobs=None
+):
+    """
+    Split a 10x multiome pre-amp FASTQ file into ATAC, GEX and other reads.
+
+    If lists of files are provided, process all of them in parallel based on
+    the number of jobs (n_jobs).
+
+    :param in_file_name: Input FASTQ file path
+    :type in_file_name: str
+    :param atac_file_name: Output FASTQ file path for ATAC reads
+    :type atac_file_name: str 
+    :param gex_file_name: Output FASTQ file path for GEX reads
+    :type gex_file_name: str
+    :param other_file_name: Output FASTQ file path for unclassified reads
+    :type other_file_name: str
+    :param atac_technical_file_name: Optional output FASTQ file path for ATAC technical sequences
+    :type atac_technical_file_name: str or None
+    :param n_records: Number of records to process (None for all)
+    :type n_records: int or None
+    :return: Array of counts [ATAC reads, GEX reads, other reads]
+    :rtype: numpy.ndarray
+    """
+    
+    if n_jobs is None or not isinstance(in_file_name, (tuple, list)):
+        return _split_multiome_preamp_fastq(
+            in_file_name,
+            atac_file_name,
+            gex_file_name,
+            other_file_name,
+            atac_technical_file_name,
+            n_records
+        )
+    
+    if atac_technical_file_name is None:
+        atac_technical_file_name = itertools.repeat(None)
+
+    return np.stack([
+        r
+        for r in joblib.Parallel(n_jobs=n_jobs)(
+            joblib.delayed(_split_multiome_preamp_fastq)(
+                *files,
+                n_records=n_records
+            )
+            for files in zip(
+                in_file_name,
+                atac_file_name,
+                gex_file_name,
+                other_file_name,
+                atac_technical_file_name
+            )
+        )
+    ])
+
+
+def _split_multiome_preamp_fastq(
+    in_file_name,
+    atac_file_name,
+    gex_file_name,
+    other_file_name,
+    atac_technical_file_name=None,
     n_records=None
 ):
+    """
+    Split a 10x multiome pre-amp FASTQ file into ATAC, GEX and other reads.
 
+    :param in_file_name: Input FASTQ file path
+    :type in_file_name: str
+    :param atac_file_name: Output FASTQ file path for ATAC reads
+    :type atac_file_name: str 
+    :param gex_file_name: Output FASTQ file path for GEX reads
+    :type gex_file_name: str
+    :param other_file_name: Output FASTQ file path for unclassified reads
+    :type other_file_name: str
+    :param atac_technical_file_name: Optional output FASTQ file path for ATAC technical sequences
+    :type atac_technical_file_name: str or None
+    :param n_records: Number of records to process (None for all)
+    :type n_records: int or None
+    :return: Array of counts [ATAC reads, GEX reads, other reads]
+    :rtype: numpy.ndarray
+    """
+    
     result_counts = np.zeros(3, dtype=int)
 
     gex_barcodes = load_gex_barcodes()
@@ -140,66 +230,3 @@ def split_multiome_preamp_fastq(
                 atac_tech_fh.close()
 
     return result_counts
-
-
-def write_record(
-    header,
-    seq,
-    qual,
-    out_fh
-):
-
-    print(header, file=out_fh)
-    print(seq, file=out_fh)
-    print("+", file=out_fh)
-    print(qual, file=out_fh)
-
-
-def process_atac_header(
-    header,
-    barcode,
-    barcode_quality,
-    atac_correction_table,
-    atac_gex_translation_table
-):
-    
-    corrected_barcode = translate_barcode(
-        correct_barcode(
-            barcode,
-            barcode_quality,
-            atac_correction_table
-        ),
-        atac_gex_translation_table
-    )
-
-    if corrected_barcode is not None:
-        tags = f"CB={corrected_barcode} CR={barcode} CY={barcode_quality}"
-    else:
-        tags = f"CR={barcode} CY={barcode_quality}"
-
-    return f"{header} {tags}"
-
-
-def process_gex_header(
-    header,
-    barcode,
-    barcode_quality,
-    umi,
-    umi_quality,
-    gex_correction_table
-):
-    
-    corrected_barcode = correct_barcode(
-        barcode,
-        barcode_quality,
-        gex_correction_table
-    )
-
-    if corrected_barcode is not None:
-        bc_tags = f"CB={corrected_barcode} CR={barcode} CY={barcode_quality}"
-    else:
-        bc_tags = f"CR={barcode} CY={barcode_quality}"
-
-    umi_tags = f"UB={umi} UR={umi} UY={umi_quality}"
-
-    return f"{header} {bc_tags} {umi_tags}"

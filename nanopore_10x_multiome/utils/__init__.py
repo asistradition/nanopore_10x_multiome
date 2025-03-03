@@ -1,7 +1,8 @@
 from ._fastq import (
     fastq_gen,
     fastqProcessor,
-    convert_qual_illumina
+    convert_qual_illumina,
+    write_record
 )
 
 from ._sequence import (

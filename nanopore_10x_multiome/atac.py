@@ -1,6 +1,7 @@
 import regex
 
 from nanopore_10x_multiome.utils import RC, REV, get_barcode_parasail
+from nanopore_10x_multiome.barcodes import translate_barcode, correct_barcode
 
 ###############################################################################
 # 10x multiome ATAC sequence
@@ -147,3 +148,27 @@ def get_atac_barcode_parasail(seq, qual):
         TENX_ATAC_ADAPTER,
         16
     )
+
+def process_atac_header(
+    header,
+    barcode,
+    barcode_quality,
+    atac_correction_table,
+    atac_gex_translation_table
+):
+    
+    corrected_barcode = translate_barcode(
+        correct_barcode(
+            barcode,
+            barcode_quality,
+            atac_correction_table
+        ),
+        atac_gex_translation_table
+    )
+
+    if corrected_barcode is not None:
+        tags = f"CB={corrected_barcode} CR={barcode} CY={barcode_quality}"
+    else:
+        tags = f"CR={barcode} CY={barcode_quality}"
+
+    return f"{header} {tags}"

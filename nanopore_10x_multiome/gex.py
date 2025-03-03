@@ -1,6 +1,7 @@
 import regex
 
 from nanopore_10x_multiome.utils import RC, REV, get_barcode_parasail
+from nanopore_10x_multiome.barcodes import correct_barcode
 
 ###############################################################################
 # 10x multiome ATAC sequence
@@ -66,3 +67,27 @@ def get_gex_anchors(
     umi = _bc[bc_len:], _bc_qual[bc_len:]
 
     return barcode, umi, _seq_loc
+
+def process_gex_header(
+    header,
+    barcode,
+    barcode_quality,
+    umi,
+    umi_quality,
+    gex_correction_table
+):
+    
+    corrected_barcode = correct_barcode(
+        barcode,
+        barcode_quality,
+        gex_correction_table
+    )
+
+    if corrected_barcode is not None:
+        bc_tags = f"CB={corrected_barcode} CR={barcode} CY={barcode_quality}"
+    else:
+        bc_tags = f"CR={barcode} CY={barcode_quality}"
+
+    umi_tags = f"UB={umi} UR={umi} UY={umi_quality}"
+
+    return f"{header} {bc_tags} {umi_tags}"

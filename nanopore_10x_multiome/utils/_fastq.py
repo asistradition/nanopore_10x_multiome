@@ -103,3 +103,16 @@ class fastqProcessor:
             return con.strip().split()[0]
         except IndexError:
             return None
+
+
+def write_record(
+    header,
+    seq,
+    qual,
+    out_fh
+):
+
+    print(header, file=out_fh)
+    print(seq, file=out_fh)
+    print("+", file=out_fh)
+    print(qual, file=out_fh)
