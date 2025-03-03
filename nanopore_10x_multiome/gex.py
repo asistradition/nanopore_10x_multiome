@@ -53,13 +53,14 @@ def get_gex_anchors(
             TENX_GEX_ADAPTER,
             bc_len=bc_umi_len
         )
+
+        if _bc is None:
+            return None, None, None
+
         _seq_loc = 0, max(_bc_pos - bc_umi_len, 0)
     else:
         _seq_loc = min(_bc_pos - bc_umi_len, n), n
 
-    if _bc is None:
-        return None, None, None
-    
     if (_seq_loc[1] - _seq_loc[0]) < min_len:
         return None, None, None
     
