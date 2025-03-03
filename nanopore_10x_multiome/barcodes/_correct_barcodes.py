@@ -9,7 +9,7 @@ def barcode_correction_table(barcodes):
         return [
             x[:s] + c + x[s+1:]
             for s in range(len(x))
-            for c in ["A", "T", "G", "C"]
+            for c in ["A", "T", "G", "C", "N"]
         ]
 
     return {
