@@ -81,7 +81,8 @@ def split_multiome_preamp_fastq(
             gex_file_name,
             other_file_name,
             atac_technical_file_name,
-            n_records
+            n_records=n_records,
+            write_only_valid_barcodes=write_only_valid_barcodes
         )
     
     if atac_technical_file_name is None:
