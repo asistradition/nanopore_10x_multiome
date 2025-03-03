@@ -91,4 +91,4 @@ def process_gex_header(
 
     umi_tags = f"UB={umi} UR={umi} UY={umi_quality}"
 
-    return f"{header} {bc_tags} {umi_tags}"
+    return f"{header} {bc_tags} {umi_tags}", corrected_barcode is not None

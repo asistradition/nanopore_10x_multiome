@@ -171,4 +171,4 @@ def process_atac_header(
     else:
         tags = f"CR={barcode} CY={barcode_quality}"
 
-    return f"{header} {tags}"
+    return f"{header} {tags}", corrected_barcode is not None

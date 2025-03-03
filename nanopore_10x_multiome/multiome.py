@@ -49,7 +49,8 @@ def split_multiome_preamp_fastq(
     atac_technical_file_name=None,
     n_records=None,
     n_jobs=None,
-    progress_bar=False
+    progress_bar=False,
+    write_only_valid_barcodes=False
 ):
     """
     Split a 10x multiome pre-amp FASTQ file into ATAC, GEX and other reads.
@@ -110,7 +111,8 @@ def split_multiome_preamp_fastq(
                 atac_barcodes=atac_barcodes,
                 gex_correction_table=gex_correction_table,
                 atac_correction_table=atac_correction_table,
-                atac_gex_translation_table=atac_gex_translation_table
+                atac_gex_translation_table=atac_gex_translation_table,
+                write_only_valid_barcodes=write_only_valid_barcodes
         )
             for files in zip(
                 in_file_name,
@@ -135,7 +137,8 @@ def _split_multiome_preamp_fastq(
     atac_barcodes=None,
     gex_correction_table=None,
     atac_correction_table=None,
-    atac_gex_translation_table=None
+    atac_gex_translation_table=None,
+    write_only_valid_barcodes=False
 ):
     """
     Split a 10x multiome pre-amp FASTQ file into ATAC, GEX and other reads.
@@ -201,13 +204,16 @@ def _split_multiome_preamp_fastq(
 
                 if _bc is not None:
 
-                    _header = process_atac_header(
+                    _header, _valid = process_atac_header(
                         c,
                         _bc,
                         _bc_qual,
                         atac_correction_table,
                         atac_gex_translation_table
                     )
+
+                    if write_only_valid_barcodes and not _valid:
+                        continue
 
                     write_record(
                         _header,
@@ -231,15 +237,20 @@ def _split_multiome_preamp_fastq(
                 _bc, _umi, gex_locs = get_gex_anchors(s, q)
 
                 if _bc is not None:
+                    _header, _valid = process_gex_header(
+                        c,
+                        _bc[0],
+                        _bc[1],
+                        _umi[0],
+                        _umi[1],
+                        gex_correction_table
+                    )
+
+                    if write_only_valid_barcodes and not _valid:
+                        continue
+
                     write_record(
-                        process_gex_header(
-                            c,
-                            _bc[0],
-                            _bc[1],
-                            _umi[0],
-                            _umi[1],
-                            gex_correction_table
-                        ),
+                        _header,
                         s[gex_locs[0]:gex_locs[1]],
                         q[gex_locs[0]:gex_locs[1]],
                         gex_fh
