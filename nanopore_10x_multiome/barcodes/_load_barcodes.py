@@ -19,6 +19,27 @@ def load_gex_barcodes():
     ).values.ravel()
 
 
-def load_translations():
-    return dict(zip(load_atac_barcodes(), load_gex_barcodes()))
+def load_translations(
+    atac_barcodes=None,
+    gex_barcodes=None
+):
+    
 
+    return dict(zip(
+        atac_barcodes if atac_barcodes is not None else load_atac_barcodes(),
+        gex_barcodes if gex_barcodes is not None else load_gex_barcodes()
+    ))
+
+
+def translate_barcode(
+    barcode,
+    translation_table
+):
+    
+    if barcode is None:
+        return None
+
+    try:
+        return translation_table[barcode]
+    except KeyError:
+        return barcode

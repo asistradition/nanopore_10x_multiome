@@ -25,10 +25,13 @@ gex_re = regex.compile(
 def get_gex_anchors(
     seq,
     qual,
-    min_len=25
+    min_len=25,
+    bc_len=16,
+    umi_len=12
 ):
 
     n = len(seq)
+    bc_umi_len = bc_len + umi_len
     seq = seq.upper()
 
     # Find 10x GEX Barcode on the forward strand
@@ -47,11 +50,11 @@ def get_gex_anchors(
             REV(qual),
             gex_re,
             TENX_GEX_ADAPTER,
-            bc_len=28
+            bc_len=bc_umi_len
         )
-        _seq_loc = 0, max(_bc_pos - 28, 0)
+        _seq_loc = 0, max(_bc_pos - bc_umi_len, 0)
     else:
-        _seq_loc = min(_bc_pos - 28, n), n
+        _seq_loc = min(_bc_pos - bc_umi_len, n), n
 
     if _bc is None:
         return None, None, None
@@ -59,4 +62,7 @@ def get_gex_anchors(
     if (_seq_loc[1] - _seq_loc[0]) < min_len:
         return None, None, None
     
-    return _bc, _bc_qual, _seq_loc
+    barcode = _bc[0:bc_len], _bc_qual[0:bc_len]
+    umi = _bc[bc_len:], _bc_qual[bc_len:]
+
+    return barcode, umi, _seq_loc

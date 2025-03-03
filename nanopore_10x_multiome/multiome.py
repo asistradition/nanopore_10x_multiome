@@ -3,6 +3,14 @@ import numpy as np
 from nanopore_10x_multiome.utils import fastqProcessor
 from nanopore_10x_multiome.atac import get_atac_anchors
 from nanopore_10x_multiome.gex import get_gex_anchors
+from nanopore_10x_multiome.barcodes import (
+    translate_barcode,
+    load_gex_barcodes,
+    load_atac_barcodes,
+    load_translations,
+    correct_barcode,
+    barcode_correction_table
+)
 
 ###############################################################################
 # 10x multiome ATAC tags
@@ -33,6 +41,16 @@ def split_multiome_preamp_fastq(
 
     result_counts = np.zeros(3, dtype=int)
 
+    gex_barcodes = load_gex_barcodes()
+    atac_barcodes = load_atac_barcodes()
+
+    gex_correction_table = barcode_correction_table(gex_barcodes)
+    atac_correction_table = barcode_correction_table(atac_barcodes)
+    atac_gex_translation_table = load_translations(
+        atac_barcodes,
+        gex_barcodes
+    )
+
     processor = fastqProcessor(
         verify_ids=False,
         phred_type='raw',
@@ -61,16 +79,25 @@ def split_multiome_preamp_fastq(
                 _bc, _bc_qual, tn5_locs = get_atac_anchors(s, q)
 
                 if _bc is not None:
-                    print_record(
-                        c + " barcode=" + _bc + " bcqual=" + _bc_qual,
+
+                    _header = process_atac_header(
+                        c,
+                        _bc,
+                        _bc_qual,
+                        atac_correction_table,
+                        atac_gex_translation_table
+                    )
+
+                    write_record(
+                        _header,
                         s[tn5_locs[1]:tn5_locs[2]],
                         q[tn5_locs[1]:tn5_locs[2]],
                         atac_fh
                     )
 
                     if atac_tech_fh is not None:
-                        print_record(
-                            c + " barcode=" + _bc + " bcqual=" + _bc_qual,
+                        write_record(
+                            _header,
                             s[:tn5_locs[1]] + '----' + s[tn5_locs[2]:],
                             q[:tn5_locs[1]] + '----' + q[tn5_locs[2]:],
                             atac_tech_fh
@@ -80,11 +107,18 @@ def split_multiome_preamp_fastq(
                     continue
 
                 # Check for GEX anchors
-                _bc_umi, gex_locs = get_gex_anchors(s)
+                _bc, _umi, gex_locs = get_gex_anchors(s)
 
-                if _bc_umi is not None:
-                    print_record(
-                        c + " barcode=" + _bc_umi[0] + " umi=" + _bc_umi[1],
+                if _bc is not None:
+                    write_record(
+                        process_gex_header(
+                            c,
+                            _bc[0],
+                            _bc[1],
+                            _umi[0],
+                            _umi[1],
+                            gex_correction_table
+                        ),
                         s[gex_locs[0]:gex_locs[1]],
                         q[gex_locs[0]:gex_locs[1]],
                         gex_fh
@@ -93,7 +127,7 @@ def split_multiome_preamp_fastq(
                     continue
 
                 # Put the remains into other
-                print_record(
+                write_record(
                     c,
                     s,
                     q,
@@ -108,7 +142,7 @@ def split_multiome_preamp_fastq(
     return result_counts
 
 
-def print_record(
+def write_record(
     header,
     seq,
     qual,
@@ -119,3 +153,53 @@ def print_record(
     print(seq, file=out_fh)
     print("+", file=out_fh)
     print(qual, file=out_fh)
+
+
+def process_atac_header(
+    header,
+    barcode,
+    barcode_quality,
+    atac_correction_table,
+    atac_gex_translation_table
+):
+    
+    corrected_barcode = translate_barcode(
+        correct_barcode(
+            barcode,
+            barcode_quality,
+            atac_correction_table
+        ),
+        atac_gex_translation_table
+    )
+
+    if corrected_barcode is not None:
+        tags = f"CB={corrected_barcode} CR={barcode} CY={barcode_quality}"
+    else:
+        tags = f"CR={barcode} CY={barcode_quality}"
+
+    return f"{header} {tags}"
+
+
+def process_gex_header(
+    header,
+    barcode,
+    barcode_quality,
+    umi,
+    umi_quality,
+    gex_correction_table
+):
+    
+    corrected_barcode = correct_barcode(
+        barcode,
+        barcode_quality,
+        gex_correction_table
+    )
+
+    if corrected_barcode is not None:
+        bc_tags = f"CB={corrected_barcode} CR={barcode} CY={barcode_quality}"
+    else:
+        bc_tags = f"CR={barcode} CY={barcode_quality}"
+
+    umi_tags = f"UB={umi} UR={umi} UY={umi_quality}"
+
+    return f"{header} {bc_tags} {umi_tags}"
