@@ -15,11 +15,11 @@ from nanopore_10x_multiome.barcodes import correct_barcode
 # ATAC and GEX barcodes are not the same - use translation table!
 ###############################################################################
 
-TENX_GEX_ADAPTER = 'ACACTCTTTCCCTACACGACGCTCTTCCGATCTNNNNNNNNNNNNNNNNNNNNNNNNNNNNTTT'
+TENX_GEX_ADAPTER = 'ACACTCTTTCCCTACACGACGCTCTTCCGATCTNNNNNNNNNNNNNNNNNNNNNNNNNNNN'
 
 
 gex_re = regex.compile(
-    '(CTACACGACGCTCTTCCGA){e<=3}TCT([ATGCN]{28})(TTT)',
+    '(CTACACGACGCTCTTCCGATCT){e<=3}([ATGCN]{29})(TTT)',
     regex.IGNORECASE
 )
 
