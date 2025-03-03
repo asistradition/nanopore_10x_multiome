@@ -5,7 +5,7 @@ import pandas as pd
 
 def load_atac_barcodes():
     return pd.read_csv(
-        os.path.join(Path(__file__).parent.absolute(), '737K-arc-v1_atac.txt'),
+        os.path.join(Path(__file__).parent.absolute(), '737K-arc-v1_atac.txt.gz'),
         sep='\t',
         header=None
     ).values.ravel()
@@ -13,7 +13,7 @@ def load_atac_barcodes():
 
 def load_gex_barcodes():
     return pd.read_csv(
-        os.path.join(Path(__file__).parent.absolute(), '737K-arc-v1_rna.txt'),
+        os.path.join(Path(__file__).parent.absolute(), '737K-arc-v1_rna.txt.gz'),
         sep='\t',
         header=None
     ).values.ravel()
