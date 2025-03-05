@@ -105,12 +105,17 @@ class fastqProcessor:
             return None
 
 
-def write_record(
+def write_fastq_record(
+    out_fh,
     header,
     seq,
     qual,
-    out_fh
+    **tags
 ):
+
+    for k, v in tags.items():
+        if v is not None:
+            header = f"{header} {k}={v}"
 
     print(header, file=out_fh)
     print(seq, file=out_fh)

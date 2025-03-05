@@ -16,21 +16,21 @@ from nanopore_10x_multiome.barcodes import translate_barcode, correct_barcode
 ###############################################################################
 
 
-TENX_ATAC_ADAPTER = 'AATGATACGGCGACCACCGAGATCTACACNNNNNNNNNNNNNNNNCGCGTCTGTCGTCGGCAGCGTCAGATGTGTATAAGAGACAG'
+TENX_ATAC_ADAPTER = 'AATGATACGGCGACCACCGAGATCTACACNNNNNNNNNNNNNNNNCGCGTCTGTCGTCGGCAGCGTCA'
 
 
 tenx_re = regex.compile(
-    '(AGATCTACAC){e<=2}([ATGCN]{16})(CGCGTCTGTCGTCGGCAGCG){e<=3}',
-    regex.IGNORECASE
+    '(CGAGATCTACAC){e<=2}([ATGCN]{16})(CGCGTCTGTCGTCGGCAGCG){e<=3}',
+    flags=regex.IGNORECASE
 )
 
 tn5_re = regex.compile(
     '(AGATGTGTATAAGAGACAG){e<=3}',
-    regex.IGNORECASE
+    flags=regex.IGNORECASE | regex.BESTMATCH
 )
 tn5_rev_re = regex.compile(
     '(CTGTCTCTTATACACATCT){e<=3}',
-    regex.IGNORECASE
+    flags=regex.IGNORECASE | regex.BESTMATCH
 )
 
 
@@ -107,8 +107,11 @@ def get_atac_anchors(
         if _fwd and _bc_pos < _single_tn5[1]:
             tn5_locs = [0, _single_tn5[1]] + [n, n]
 
-        elif _bc_pos > _single_tn5[0]:
+        elif (len(seq) - _bc_pos) > _single_tn5[0]:
             tn5_locs = [0, 0] + [_single_tn5[0], n]
+
+        else:
+            return None, None, None
 
         # Check for overlapping/no genomic Tn5 insertions
         if (tn5_locs[2] - tn5_locs[1]) < min_len:
@@ -149,8 +152,7 @@ def get_atac_barcode_parasail(seq, qual):
         16
     )
 
-def process_atac_header(
-    header,
+def process_atac_tags(
     barcode,
     barcode_quality,
     atac_correction_table,
@@ -166,9 +168,10 @@ def process_atac_header(
         atac_gex_translation_table
     )
 
-    if corrected_barcode is not None:
-        tags = f"CB={corrected_barcode} CR={barcode} CY={barcode_quality}"
-    else:
-        tags = f"CR={barcode} CY={barcode_quality}"
+    tags = {
+        'CB': corrected_barcode,
+        'CR': barcode,
+        'CY': barcode_quality
+    }
 
-    return f"{header} {tags}", corrected_barcode is not None
+    return tags, corrected_barcode is not None

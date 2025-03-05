@@ -15,7 +15,7 @@ from nanopore_10x_multiome.barcodes import correct_barcode
 # ATAC and GEX barcodes are not the same - use translation table!
 ###############################################################################
 
-TENX_GEX_ADAPTER = 'ACACTCTTTCCCTACACGACGCTCTTCCGATCTNNNNNNNNNNNNNNNNNNNNNNNNNNNNTTTT'
+TENX_GEX_ADAPTER = 'ACACTCTTTCCCTACACGACGCTCTTCCGATCTNNNNNNNNNNNNNNNNNNNNNNNNNNNNTTT'
 
 
 gex_re = regex.compile(
@@ -57,9 +57,9 @@ def get_gex_anchors(
         if _bc is None:
             return None, None, None
 
-        _seq_loc = 0, max(_bc_pos - bc_umi_len, 0)
+        _seq_loc = 0, max(n - _bc_pos - len(_bc), 0)
     else:
-        _seq_loc = min(_bc_pos - bc_umi_len, n), n
+        _seq_loc = min(_bc_pos + len(_bc), n), n
 
     if (_seq_loc[1] - _seq_loc[0]) < min_len:
         return None, None, None
@@ -69,8 +69,7 @@ def get_gex_anchors(
 
     return barcode, umi, _seq_loc
 
-def process_gex_header(
-    header,
+def process_gex_tags(
     barcode,
     barcode_quality,
     umi,
@@ -84,11 +83,13 @@ def process_gex_header(
         gex_correction_table
     )
 
-    if corrected_barcode is not None:
-        bc_tags = f"CB={corrected_barcode} CR={barcode} CY={barcode_quality}"
-    else:
-        bc_tags = f"CR={barcode} CY={barcode_quality}"
+    tags = {
+        'CB': corrected_barcode,
+        'CR': barcode,
+        'CY': barcode_quality,
+        'UB': umi,
+        'UR': umi,
+        'CY': umi_quality
+    }
 
-    umi_tags = f"UB={umi} UR={umi} UY={umi_quality}"
-
-    return f"{header} {bc_tags} {umi_tags}", corrected_barcode is not None
+    return tags, corrected_barcode is not None

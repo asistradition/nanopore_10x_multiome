@@ -6,15 +6,16 @@ import tqdm
 
 from nanopore_10x_multiome.utils import (
     fastqProcessor,
-    write_record
+    get_file_writer,
+    file_opener
 )
 from nanopore_10x_multiome.atac import (
     get_atac_anchors,
-    process_atac_header
+    process_atac_tags
 )
 from nanopore_10x_multiome.gex import (
     get_gex_anchors,
-    process_gex_header
+    process_gex_tags
 )
 from nanopore_10x_multiome.barcodes import (
     load_gex_barcodes,
@@ -50,7 +51,9 @@ def split_multiome_preamp_fastq(
     n_records=None,
     n_jobs=None,
     progress_bar=False,
-    write_only_valid_barcodes=False
+    write_only_valid_barcodes=False,
+    keep_runoff_fragments=False,
+    verbose=0
 ):
     """
     Split a 10x multiome pre-amp FASTQ file into ATAC, GEX and other reads.
@@ -82,7 +85,8 @@ def split_multiome_preamp_fastq(
             other_file_name,
             atac_technical_file_name,
             n_records=n_records,
-            write_only_valid_barcodes=write_only_valid_barcodes
+            write_only_valid_barcodes=write_only_valid_barcodes,
+            keep_runoff_fragments=keep_runoff_fragments
         )
     
     if atac_technical_file_name is None:
@@ -104,7 +108,11 @@ def split_multiome_preamp_fastq(
 
     return np.stack([
         r
-        for r in iterer(joblib.Parallel(n_jobs=n_jobs)(
+        for r in iterer(joblib.Parallel(
+            n_jobs=n_jobs,
+            batch_size=1,
+            verbose=verbose
+        )(
             joblib.delayed(_split_multiome_preamp_fastq)(
                 *files,
                 n_records=n_records,
@@ -183,16 +191,22 @@ def _split_multiome_preamp_fastq(
     )
 
     with (
-        open(in_file_name, mode='r') as fh,
-        open(atac_file_name, mode='w') as atac_fh,
-        open(gex_file_name, mode='w') as gex_fh,
-        open(other_file_name, mode='w') as other_fh
+        file_opener(in_file_name, mode='r') as fh,
+        file_opener(atac_file_name, mode='w') as atac_fh,
+        file_opener(gex_file_name, mode='w') as gex_fh,
+        file_opener(other_file_name, mode='w') as other_fh
     ):
         
+        atac_writer = get_file_writer(atac_file_name)
+        gex_writer = get_file_writer(gex_file_name)
+        other_writer = get_file_writer(other_file_name)
+
         if atac_technical_file_name is not None:
-            atac_tech_fh = open(atac_technical_file_name, mode='w')
+            atac_tech_fh = file_opener(atac_technical_file_name, mode='w')
+            atac_tech_writer = get_file_writer(atac_technical_file_name)
         else:
             atac_tech_fh = None
+            atac_tech_writer = None
 
         try:
             for x in processor.fastq_gen(fh):
@@ -205,8 +219,7 @@ def _split_multiome_preamp_fastq(
 
                 if _bc is not None:
 
-                    _header, _valid = process_atac_header(
-                        c,
+                    _tags, _valid = process_atac_tags(
                         _bc,
                         _bc_qual,
                         atac_correction_table,
@@ -216,30 +229,31 @@ def _split_multiome_preamp_fastq(
                     if write_only_valid_barcodes and not _valid:
                         continue
 
-                    write_record(
-                        _header,
+                    atac_writer(
+                        atac_fh,
+                        c,
                         s[tn5_locs[1]:tn5_locs[2]],
                         q[tn5_locs[1]:tn5_locs[2]],
-                        atac_fh
+                        **_tags
                     )
 
                     if atac_tech_fh is not None:
-                        write_record(
-                            _header,
+                        atac_tech_writer(
+                            atac_tech_fh,
+                            c,
                             s[:tn5_locs[1]] + '----' + s[tn5_locs[2]:],
                             q[:tn5_locs[1]] + '----' + q[tn5_locs[2]:],
-                            atac_tech_fh
+                           **_tags
                         )
 
                     result_counts[0] += 1
                     continue
 
-                # Check for GEX anchors
+                # If the ATAC search failed, check for GEX anchors
                 _bc, _umi, gex_locs = get_gex_anchors(s, q)
 
                 if _bc is not None:
-                    _header, _valid = process_gex_header(
-                        c,
+                    _tags, _valid = process_gex_tags(
                         _bc[0],
                         _bc[1],
                         _umi[0],
@@ -250,21 +264,22 @@ def _split_multiome_preamp_fastq(
                     if write_only_valid_barcodes and not _valid:
                         continue
 
-                    write_record(
-                        _header,
+                    gex_writer(
+                        gex_fh,
+                        c,
                         s[gex_locs[0]:gex_locs[1]],
                         q[gex_locs[0]:gex_locs[1]],
-                        gex_fh
+                        **_tags
                     )
                     result_counts[1] += 1
                     continue
 
                 # Put the remains into other
-                write_record(
+                other_writer(
+                    other_fh,
                     c,
                     s,
-                    q,
-                    other_fh
+                    q
                 )
                 result_counts[2] += 1
 

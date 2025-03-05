@@ -4,18 +4,43 @@ from nanopore_10x_multiome.utils import convert_qual_illumina
 
 def barcode_correction_table(barcodes):
 
-    def _oneoffs(x):
-
-        return [
+    def _swap_one(x):
+        return list(set([
             x[:s] + c + x[s+1:]
             for s in range(len(x))
             for c in ["A", "T", "G", "C", "N"]
-        ]
+            if c != x[s]
+        ]))
+    
+    def _add_one(x):
+        return list(set([
+            x[:s] + c + x[s:]
+            for s in range(len(x))
+            for c in ["A", "T", "G", "C", "N"]
+        ]))
+
+    def _drop_one(x):
+        return list(set([
+            x[:s] + x[s+1:]
+            for s in range(len(x))
+        ]))
+    
+    table = {}
+
+    for b in barcodes:
+        for mm in _swap_one(b) + _add_one(b) + _drop_one(b):
+            try:
+                _ = table[mm]
+                table[mm] = None
+            except KeyError:
+                table[mm] = b
+
+        table[b] = b
 
     return {
-        mm: b
-        for b in barcodes
-        for mm in _oneoffs(b)
+        k: v 
+        for k, v in table.items()
+        if v is not None
     }
 
 

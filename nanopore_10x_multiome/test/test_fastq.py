@@ -5,6 +5,7 @@ Generated with cursor/claude-3.5-sonnet and then fixed to actually work
 import pytest
 from io import StringIO
 from nanopore_10x_multiome.utils._fastq import fastqProcessor, convert_qual_illumina, fastq_gen
+from nanopore_10x_multiome.utils import RC
 
 def test_convert_qual_illumina():
     # Test basic quality conversion
@@ -109,3 +110,10 @@ def test_extract_control_id():
     assert processor.extract_control_id("@read1 description") == "@read1"
     assert processor.extract_control_id("@read1") == "@read1"
     assert processor.extract_control_id("") is None
+
+def test_rc():
+
+    seq = "ATGCNCGTA"
+    rc_seq = "TACGNGCAT"
+
+    assert RC(seq) == rc_seq
