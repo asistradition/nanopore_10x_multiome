@@ -10,37 +10,41 @@ from ._correct_barcodes import (
     barcode_correction_table
 )
 
-def load_missing_multiome_barcode_info(
-    gex_barcodes=None,
-    atac_barcodes=None,
-    gex_correction_table=None,
-    atac_correction_table=None,
-    atac_gex_translation_table=None,
-    pbar=False
-):
-    
-    if gex_barcodes is None:
-        gex_barcodes = load_gex_barcodes()
 
-    if atac_barcodes is None:
-        atac_barcodes = load_atac_barcodes()
+def load_missing_multiome_barcode_info(pbar=False, test=False):
+    BarcodeHolder.load(pbar=pbar, test=test)
 
-    if gex_correction_table is None:
-        gex_correction_table = barcode_correction_table(gex_barcodes, pbar=pbar)
 
-    if atac_correction_table is None:
-        atac_correction_table = barcode_correction_table(atac_barcodes, pbar=pbar)
+class BarcodeHolder:
 
-    if atac_gex_translation_table is None:
-        atac_gex_translation_table = load_translations(
-            atac_barcodes,
-            gex_barcodes
-        )
+    gex_barcodes = None
+    atac_barcodes = None
+    gex_correction_table = None
+    atac_correction_table = None
+    atac_gex_translation_table = None
 
-    return (
-        gex_barcodes,
-        atac_barcodes,
-        gex_correction_table,
-        atac_correction_table,
-        atac_gex_translation_table
-    )
+    @classmethod
+    def load(cls, pbar=False, test=False):
+        if cls.gex_barcodes is None:
+            cls.gex_barcodes = load_gex_barcodes(test=test)
+
+        if cls.atac_barcodes is None:
+            cls.atac_barcodes = load_atac_barcodes(test=test)
+
+        if cls.gex_correction_table is None:
+            cls.gex_correction_table = barcode_correction_table(
+                cls.gex_barcodes,
+                pbar=pbar
+            )
+
+        if cls.atac_correction_table is None:
+            cls.atac_correction_table = barcode_correction_table(
+                cls.atac_barcodes,
+                pbar=pbar
+            )
+
+        if cls.atac_gex_translation_table is None:
+            cls.atac_gex_translation_table = load_translations(
+                cls.atac_barcodes,
+                cls.gex_barcodes
+            )

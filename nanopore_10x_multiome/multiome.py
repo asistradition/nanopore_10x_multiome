@@ -17,7 +17,8 @@ from nanopore_10x_multiome.gex import (
     process_gex_tags
 )
 from nanopore_10x_multiome.barcodes import (
-    load_missing_multiome_barcode_info
+    load_missing_multiome_barcode_info,
+    BarcodeHolder
 )
 
 ###############################################################################
@@ -47,11 +48,6 @@ def split_multiome_preamp_fastq(
     n_jobs=None,
     write_only_valid_barcodes=False,
     keep_runoff_fragments=False,
-    gex_barcodes=None,
-    atac_barcodes=None,
-    gex_correction_table=None,
-    atac_correction_table=None,
-    atac_gex_translation_table=None,
     verbose=0
 ):
     """
@@ -73,16 +69,6 @@ def split_multiome_preamp_fastq(
     :param keep_runoff_fragments: Keep ATAC fragments where the barcode end is intact,
         but no Tn5 site is located on the other end. Defaults to False.
     :type keep_runoff_fragments: bool
-    :param gex_barcodes: List of valid GEX barcodes. Will be loaded if not provided.
-    :type gex_barcodes: list or None
-    :param atac_barcodes: List of valid ATAC barcodes. Will be loaded if not provided.
-    :type atac_barcodes: list or None
-    :param gex_correction_table: Correction table for GEX barcodes. Will be loaded if not provided.
-    :type gex_correction_table: dict or None
-    :param atac_correction_table: Correction table for ATAC barcodes.  Will be loaded if not provided.
-    :type atac_correction_table: dict or None
-    :param atac_gex_translation_table: Translation table between ATAC and GEX barcodes.  Will be loaded if not provided.
-    :type atac_gex_translation_table: dict or None
     :param write_only_valid_barcodes: Only write reads with valid barcodes
     :type write_only_valid_barcodes: bool
     :param verbose: Verbose parameter for joblib.Parallel
@@ -93,7 +79,7 @@ def split_multiome_preamp_fastq(
     """
 
     
-    if n_jobs is None or not isinstance(in_file_name, (tuple, list)):
+    if not isinstance(in_file_name, (tuple, list)):
         return _split_multiome_preamp_fastq(
             in_file_name,
             atac_file_name,
@@ -102,29 +88,9 @@ def split_multiome_preamp_fastq(
             atac_technical_file_name,
             write_only_valid_barcodes=write_only_valid_barcodes,
             keep_runoff_fragments=keep_runoff_fragments,
-            gex_barcodes=gex_barcodes,
-            atac_barcodes=atac_barcodes,
-            gex_correction_table=gex_correction_table,
-            atac_correction_table=atac_correction_table,
-            atac_gex_translation_table=atac_gex_translation_table
         )
     
-    if atac_technical_file_name is None:
-        atac_technical_file_name = itertools.repeat(None)
-
-    (
-        gex_barcodes,
-        atac_barcodes,
-        gex_correction_table,
-        atac_correction_table,
-        atac_gex_translation_table
-    ) = load_missing_multiome_barcode_info(
-        gex_barcodes,
-        atac_barcodes,
-        gex_correction_table,
-        atac_correction_table,
-        atac_gex_translation_table
-    )
+    load_missing_multiome_barcode_info(pbar=verbose > 0)
 
     return np.stack([
         r
@@ -135,11 +101,6 @@ def split_multiome_preamp_fastq(
         )(
             joblib.delayed(_split_multiome_preamp_fastq)(
                 *files,
-                gex_barcodes=gex_barcodes,
-                atac_barcodes=atac_barcodes,
-                gex_correction_table=gex_correction_table,
-                atac_correction_table=atac_correction_table,
-                atac_gex_translation_table=atac_gex_translation_table,
                 write_only_valid_barcodes=write_only_valid_barcodes,
                 keep_runoff_fragments=keep_runoff_fragments
             )
@@ -161,11 +122,6 @@ def _split_multiome_preamp_fastq(
     other_file_name,
     atac_technical_file_name=None,
     n_records=None,
-    gex_barcodes=None,
-    atac_barcodes=None,
-    gex_correction_table=None,
-    atac_correction_table=None,
-    atac_gex_translation_table=None,
     write_only_valid_barcodes=False,
     keep_runoff_fragments=False
 ):
@@ -208,19 +164,7 @@ def _split_multiome_preamp_fastq(
     result_counts = np.zeros(3, dtype=int)
 
     # Load any missing barcode information
-    (
-        gex_barcodes,
-        atac_barcodes,
-        gex_correction_table,
-        atac_correction_table,
-        atac_gex_translation_table
-    ) = load_missing_multiome_barcode_info(
-        gex_barcodes,
-        atac_barcodes,
-        gex_correction_table,
-        atac_correction_table,
-        atac_gex_translation_table
-    )
+    load_missing_multiome_barcode_info(pbar=False)
 
     # Initialize FASTQ processor
     processor = fastqProcessor(
@@ -268,8 +212,8 @@ def _split_multiome_preamp_fastq(
                     _tags, _valid = process_atac_tags(
                         _bc,
                         _bc_qual,
-                        atac_correction_table,
-                        atac_gex_translation_table
+                        BarcodeHolder.atac_correction_table,
+                        BarcodeHolder.atac_gex_translation_table
                     )
 
                     if write_only_valid_barcodes and not _valid:
@@ -307,7 +251,7 @@ def _split_multiome_preamp_fastq(
                         _bc[1],
                         _umi[0],
                         _umi[1],
-                        gex_correction_table
+                        BarcodeHolder.gex_correction_table
                     )
 
                     if write_only_valid_barcodes and not _valid:

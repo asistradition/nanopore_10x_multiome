@@ -3,19 +3,21 @@ from pathlib import Path
 import pandas as pd
 
 
-def load_atac_barcodes():
+def load_atac_barcodes(test=False):
     return pd.read_csv(
         os.path.join(Path(__file__).parent.absolute(), '737K-arc-v1_atac.txt.gz'),
         sep='\t',
-        header=None
+        header=None,
+        nrows=100 if test else None
     ).values.ravel()
 
 
-def load_gex_barcodes():
+def load_gex_barcodes(test=False):
     return pd.read_csv(
         os.path.join(Path(__file__).parent.absolute(), '737K-arc-v1_rna.txt.gz'),
         sep='\t',
-        header=None
+        header=None,
+        nrows=100 if test else None
     ).values.ravel()
 
 
