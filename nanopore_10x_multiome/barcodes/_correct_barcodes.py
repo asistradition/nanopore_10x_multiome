@@ -63,7 +63,7 @@ def barcode_correction_table(barcodes, pbar=False):
                 table[mm] = b
 
     # No matter what, original barcode maps to itself
-    for b in iter_wrap(barcodes):
+    for b in barcodes:
         table[b] = b
 
     # Return only unambiguous corrections

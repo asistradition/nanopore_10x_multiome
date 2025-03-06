@@ -70,8 +70,9 @@ def split_multiome_preamp_fastq(
     :type atac_technical_file_name: str or None
     :param n_jobs: Number of parallel processes for joblib, defaults to None
     :type n_jobs: int or None
-    :param n_records: Number of records to process (None for all), defaults to None
-    :type n_records: int or None
+    :param keep_runoff_fragments: Keep ATAC fragments where the barcode end is intact,
+        but no Tn5 site is located on the other end. Defaults to False.
+    :type keep_runoff_fragments: bool
     :param gex_barcodes: List of valid GEX barcodes. Will be loaded if not provided.
     :type gex_barcodes: list or None
     :param atac_barcodes: List of valid ATAC barcodes. Will be loaded if not provided.
@@ -84,6 +85,8 @@ def split_multiome_preamp_fastq(
     :type atac_gex_translation_table: dict or None
     :param write_only_valid_barcodes: Only write reads with valid barcodes
     :type write_only_valid_barcodes: bool
+    :param verbose: Verbose parameter for joblib.Parallel
+    :type verbose: int
 
     :return: Array of counts [ATAC reads, GEX reads, other reads]
     :rtype: numpy.ndarray
@@ -138,7 +141,7 @@ def split_multiome_preamp_fastq(
                 atac_correction_table=atac_correction_table,
                 atac_gex_translation_table=atac_gex_translation_table,
                 write_only_valid_barcodes=write_only_valid_barcodes,
-               keep_runoff_fragments=keep_runoff_fragments
+                keep_runoff_fragments=keep_runoff_fragments
             )
             for files in zip(
                 in_file_name,
@@ -163,7 +166,8 @@ def _split_multiome_preamp_fastq(
     gex_correction_table=None,
     atac_correction_table=None,
     atac_gex_translation_table=None,
-    write_only_valid_barcodes=False
+    write_only_valid_barcodes=False,
+    keep_runoff_fragments=False
 ):
     """
     Split a multiome pre-amplification FASTQ file into ATAC, GEX and other reads.
@@ -193,6 +197,8 @@ def _split_multiome_preamp_fastq(
     :type atac_gex_translation_table: dict or None
     :param write_only_valid_barcodes: Only write reads with valid barcodes
     :type write_only_valid_barcodes: bool
+    :param keep_runoff_fragments: Keep ATAC fragments where the barcode end is intact,
+        but no Tn5 site is located on the other end. Defaults to False.
 
     :return: Array of counts [ATAC reads, GEX reads, other reads]
     :rtype: numpy.ndarray
@@ -251,7 +257,11 @@ def _split_multiome_preamp_fastq(
                 c, s, q = x[0]  # header, sequence, quality scores
 
                 # First try to identify as ATAC read
-                _bc, _bc_qual, tn5_locs = get_atac_anchors(s, q)
+                _bc, _bc_qual, tn5_locs = get_atac_anchors(
+                    s,
+                    q,
+                    keep_runoff_fragments=keep_runoff_fragments
+                )
 
                 if _bc is not None:
                     # Process ATAC barcode and check validity
