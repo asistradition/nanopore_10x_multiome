@@ -97,7 +97,8 @@ def split_multiome_preamp_fastq(
         for r in joblib.Parallel(
             n_jobs=n_jobs,
             batch_size=1,
-            verbose=verbose
+            verbose=verbose,
+            backend='multiprocessing'
         )(
             joblib.delayed(_split_multiome_preamp_fastq)(
                 *files,
