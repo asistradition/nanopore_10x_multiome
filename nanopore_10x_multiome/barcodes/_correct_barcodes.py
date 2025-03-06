@@ -1,10 +1,32 @@
 import numpy as np
+import tqdm
 
 from nanopore_10x_multiome.utils import convert_qual_illumina
 
-def barcode_correction_table(barcodes):
+def barcode_correction_table(barcodes, pbar=False):
+    """
+    Create a lookup table for correcting barcodes with single-base errors.
+
+    Generates a mapping from potentially erroneous barcodes to their correct versions
+    by considering all possible single-base errors (substitutions, insertions, deletions).
+    If multiple valid barcodes could match an error, that error maps to None.
+
+    :param barcodes: List of valid barcode sequences
+    :type barcodes: list[str]
+    :param pbar: Whether to show a progress bar
+    :type pbar: bool
+    :return: Dictionary mapping potentially erroneous barcodes to their corrections
+    :rtype: dict[str, str]
+    """
+
+    if pbar:
+        iter_wrap = tqdm.tqdm
+    else:
+        def iter_wrap(x):
+            return x
 
     def _swap_one(x):
+        # Generate all possible single-base substitutions
         return list(set([
             x[:s] + c + x[s+1:]
             for s in range(len(x))
@@ -13,13 +35,15 @@ def barcode_correction_table(barcodes):
         ]))
     
     def _add_one(x):
+        # Generate all possible single-base insertions
         return list(set([
             x[:s] + c + x[s:]
-            for s in range(len(x))
+            for s in range(len(x) + 1)
             for c in ["A", "T", "G", "C", "N"]
         ]))
 
     def _drop_one(x):
+        # Generate all possible single-base deletions
         return list(set([
             x[:s] + x[s+1:]
             for s in range(len(x))
@@ -27,19 +51,25 @@ def barcode_correction_table(barcodes):
     
     table = {}
 
-    for b in barcodes:
+    for b in iter_wrap(barcodes):
+        # Generate all possible single-error variants
         for mm in _swap_one(b) + _add_one(b) + _drop_one(b):
             try:
+                # If variant already exists, mark as ambiguous
                 _ = table[mm]
                 table[mm] = None
             except KeyError:
+                # Otherwise map variant to original barcode
                 table[mm] = b
 
+    # No matter what, original barcode maps to itself
+    for b in iter_wrap(barcodes):
         table[b] = b
 
+    # Return only unambiguous corrections
     return {
         k: v 
-        for k, v in table.items()
+        for k, v in iter_wrap(table.items())
         if v is not None
     }
 
