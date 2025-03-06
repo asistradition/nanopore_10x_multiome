@@ -15,7 +15,8 @@ def load_missing_multiome_barcode_info(
     atac_barcodes=None,
     gex_correction_table=None,
     atac_correction_table=None,
-    atac_gex_translation_table=None
+    atac_gex_translation_table=None,
+    pbar=False
 ):
     
     if gex_barcodes is None:
@@ -25,10 +26,10 @@ def load_missing_multiome_barcode_info(
         atac_barcodes = load_atac_barcodes()
 
     if gex_correction_table is None:
-        gex_correction_table = barcode_correction_table(gex_barcodes)
+        gex_correction_table = barcode_correction_table(gex_barcodes, pbar=pbar)
 
     if atac_correction_table is None:
-        atac_correction_table = barcode_correction_table(atac_barcodes)
+        atac_correction_table = barcode_correction_table(atac_barcodes, pbar=pbar)
 
     if atac_gex_translation_table is None:
         atac_gex_translation_table = load_translations(
