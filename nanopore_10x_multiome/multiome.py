@@ -17,10 +17,7 @@ from nanopore_10x_multiome.gex import (
     process_gex_tags
 )
 from nanopore_10x_multiome.barcodes import (
-    load_gex_barcodes,
-    load_atac_barcodes,
-    load_translations,
-    barcode_correction_table
+    load_missing_multiome_barcode_info
 )
 
 ###############################################################################
@@ -118,7 +115,7 @@ def split_multiome_preamp_fastq(
         gex_correction_table,
         atac_correction_table,
         atac_gex_translation_table
-    ) = _load_missing_multiome_barcode_info(
+    ) = load_missing_multiome_barcode_info(
         gex_barcodes,
         atac_barcodes,
         gex_correction_table,
@@ -211,7 +208,7 @@ def _split_multiome_preamp_fastq(
         gex_correction_table,
         atac_correction_table,
         atac_gex_translation_table
-    ) = _load_missing_multiome_barcode_info(
+    ) = load_missing_multiome_barcode_info(
         gex_barcodes,
         atac_barcodes,
         gex_correction_table,
@@ -332,38 +329,3 @@ def _split_multiome_preamp_fastq(
                 atac_tech_fh.close()
 
     return result_counts
-
-
-def _load_missing_multiome_barcode_info(
-    gex_barcodes=None,
-    atac_barcodes=None,
-    gex_correction_table=None,
-    atac_correction_table=None,
-    atac_gex_translation_table=None
-):
-    
-    if gex_barcodes is None:
-        gex_barcodes = load_gex_barcodes()
-
-    if atac_barcodes is None:
-        atac_barcodes = load_atac_barcodes()
-
-    if gex_correction_table is None:
-        gex_correction_table = barcode_correction_table(gex_barcodes)
-
-    if atac_correction_table is None:
-        atac_correction_table = barcode_correction_table(atac_barcodes)
-
-    if atac_gex_translation_table is None:
-        atac_gex_translation_table = load_translations(
-            atac_barcodes,
-            gex_barcodes
-        )
-
-    return (
-        gex_barcodes,
-        atac_barcodes,
-        gex_correction_table,
-        atac_correction_table,
-        atac_gex_translation_table
-    )
