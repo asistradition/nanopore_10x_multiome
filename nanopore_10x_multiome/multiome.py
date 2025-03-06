@@ -2,7 +2,6 @@ import itertools
 
 import numpy as np
 import joblib
-import tqdm
 
 from nanopore_10x_multiome.utils import (
     fastqProcessor,
@@ -48,34 +47,51 @@ def split_multiome_preamp_fastq(
     gex_file_name,
     other_file_name,
     atac_technical_file_name=None,
-    n_records=None,
     n_jobs=None,
-    progress_bar=False,
     write_only_valid_barcodes=False,
     keep_runoff_fragments=False,
+    gex_barcodes=None,
+    atac_barcodes=None,
+    gex_correction_table=None,
+    atac_correction_table=None,
+    atac_gex_translation_table=None,
     verbose=0
 ):
     """
-    Split a 10x multiome pre-amp FASTQ file into ATAC, GEX and other reads.
-
-    If lists of files are provided, process all of them in parallel based on
-    the number of jobs (n_jobs).
+    Split multiome pre-amplification FASTQ file(s) into ATAC, GEX and other reads.
 
     :param in_file_name: Input FASTQ file path
     :type in_file_name: str
     :param atac_file_name: Output FASTQ file path for ATAC reads
-    :type atac_file_name: str 
+    :type atac_file_name: str
     :param gex_file_name: Output FASTQ file path for GEX reads
     :type gex_file_name: str
-    :param other_file_name: Output FASTQ file path for unclassified reads
+    :param other_file_name: Output FASTQ file path for unidentified reads
+        (genomic, too many errors near barcode, etc)
     :type other_file_name: str
-    :param atac_technical_file_name: Optional output FASTQ file path for ATAC technical sequences
+    :param atac_technical_file_name: Optional output file for ATAC technical sequences
     :type atac_technical_file_name: str or None
-    :param n_records: Number of records to process (None for all)
+    :param n_jobs: Number of parallel processes for joblib, defaults to None
+    :type n_jobs: int or None
+    :param n_records: Number of records to process (None for all), defaults to None
     :type n_records: int or None
+    :param gex_barcodes: List of valid GEX barcodes. Will be loaded if not provided.
+    :type gex_barcodes: list or None
+    :param atac_barcodes: List of valid ATAC barcodes. Will be loaded if not provided.
+    :type atac_barcodes: list or None
+    :param gex_correction_table: Correction table for GEX barcodes. Will be loaded if not provided.
+    :type gex_correction_table: dict or None
+    :param atac_correction_table: Correction table for ATAC barcodes.  Will be loaded if not provided.
+    :type atac_correction_table: dict or None
+    :param atac_gex_translation_table: Translation table between ATAC and GEX barcodes.  Will be loaded if not provided.
+    :type atac_gex_translation_table: dict or None
+    :param write_only_valid_barcodes: Only write reads with valid barcodes
+    :type write_only_valid_barcodes: bool
+
     :return: Array of counts [ATAC reads, GEX reads, other reads]
     :rtype: numpy.ndarray
     """
+
     
     if n_jobs is None or not isinstance(in_file_name, (tuple, list)):
         return _split_multiome_preamp_fastq(
@@ -84,9 +100,13 @@ def split_multiome_preamp_fastq(
             gex_file_name,
             other_file_name,
             atac_technical_file_name,
-            n_records=n_records,
             write_only_valid_barcodes=write_only_valid_barcodes,
-            keep_runoff_fragments=keep_runoff_fragments
+            keep_runoff_fragments=keep_runoff_fragments,
+            gex_barcodes=gex_barcodes,
+            atac_barcodes=atac_barcodes,
+            gex_correction_table=gex_correction_table,
+            atac_correction_table=atac_correction_table,
+            atac_gex_translation_table=atac_gex_translation_table
         )
     
     if atac_technical_file_name is None:
@@ -98,31 +118,31 @@ def split_multiome_preamp_fastq(
         gex_correction_table,
         atac_correction_table,
         atac_gex_translation_table
-    ) = _load_missing_multiome_barcode_info()
-
-    if progress_bar:
-        iterer = tqdm.tqdm
-    else:
-        def iterer(x, **kwargs):
-            return iter(x)
+    ) = _load_missing_multiome_barcode_info(
+        gex_barcodes,
+        atac_barcodes,
+        gex_correction_table,
+        atac_correction_table,
+        atac_gex_translation_table
+    )
 
     return np.stack([
         r
-        for r in iterer(joblib.Parallel(
+        for r in joblib.Parallel(
             n_jobs=n_jobs,
             batch_size=1,
             verbose=verbose
         )(
             joblib.delayed(_split_multiome_preamp_fastq)(
                 *files,
-                n_records=n_records,
                 gex_barcodes=gex_barcodes,
                 atac_barcodes=atac_barcodes,
                 gex_correction_table=gex_correction_table,
                 atac_correction_table=atac_correction_table,
                 atac_gex_translation_table=atac_gex_translation_table,
-                write_only_valid_barcodes=write_only_valid_barcodes
-        )
+                write_only_valid_barcodes=write_only_valid_barcodes,
+               keep_runoff_fragments=keep_runoff_fragments
+            )
             for files in zip(
                 in_file_name,
                 atac_file_name,
@@ -130,9 +150,8 @@ def split_multiome_preamp_fastq(
                 other_file_name,
                 atac_technical_file_name
             )
-        ),
-        total=len(in_file_name)
-    )])
+        )
+    ])
 
 
 def _split_multiome_preamp_fastq(
@@ -150,26 +169,42 @@ def _split_multiome_preamp_fastq(
     write_only_valid_barcodes=False
 ):
     """
-    Split a 10x multiome pre-amp FASTQ file into ATAC, GEX and other reads.
+    Split a multiome pre-amplification FASTQ file into ATAC, GEX and other reads.
 
     :param in_file_name: Input FASTQ file path
     :type in_file_name: str
     :param atac_file_name: Output FASTQ file path for ATAC reads
-    :type atac_file_name: str 
+    :type atac_file_name: str
     :param gex_file_name: Output FASTQ file path for GEX reads
     :type gex_file_name: str
-    :param other_file_name: Output FASTQ file path for unclassified reads
+    :param other_file_name: Output FASTQ file path for unidentified reads
+        (genomic, too many errors near barcode, etc)
     :type other_file_name: str
-    :param atac_technical_file_name: Optional output FASTQ file path for ATAC technical sequences
+    :param atac_technical_file_name: Optional output file for ATAC technical sequences
     :type atac_technical_file_name: str or None
     :param n_records: Number of records to process (None for all)
     :type n_records: int or None
+    :param gex_barcodes: List of valid GEX barcodes
+    :type gex_barcodes: list or None
+    :param atac_barcodes: List of valid ATAC barcodes
+    :type atac_barcodes: list or None
+    :param gex_correction_table: Correction table for GEX barcodes
+    :type gex_correction_table: dict or None
+    :param atac_correction_table: Correction table for ATAC barcodes
+    :type atac_correction_table: dict or None
+    :param atac_gex_translation_table: Translation table between ATAC and GEX barcodes
+    :type atac_gex_translation_table: dict or None
+    :param write_only_valid_barcodes: Only write reads with valid barcodes
+    :type write_only_valid_barcodes: bool
+
     :return: Array of counts [ATAC reads, GEX reads, other reads]
     :rtype: numpy.ndarray
     """
-    
+
+    # Initialize counters for ATAC, GEX and other reads
     result_counts = np.zeros(3, dtype=int)
 
+    # Load any missing barcode information
     (
         gex_barcodes,
         atac_barcodes,
@@ -184,12 +219,14 @@ def _split_multiome_preamp_fastq(
         atac_gex_translation_table
     )
 
+    # Initialize FASTQ processor
     processor = fastqProcessor(
         verify_ids=False,
         phred_type='raw',
         n_records=n_records
     )
 
+    # Open input and output files
     with (
         file_opener(in_file_name, mode='r') as fh,
         file_opener(atac_file_name, mode='w') as atac_fh,
@@ -197,10 +234,12 @@ def _split_multiome_preamp_fastq(
         file_opener(other_file_name, mode='w') as other_fh
     ):
         
+        # Get file writers for each output
         atac_writer = get_file_writer(atac_file_name)
         gex_writer = get_file_writer(gex_file_name)
         other_writer = get_file_writer(other_file_name)
 
+        # Handle optional ATAC technical file
         if atac_technical_file_name is not None:
             atac_tech_fh = file_opener(atac_technical_file_name, mode='w')
             atac_tech_writer = get_file_writer(atac_technical_file_name)
@@ -209,16 +248,16 @@ def _split_multiome_preamp_fastq(
             atac_tech_writer = None
 
         try:
+            # Process each FASTQ record
             for x in processor.fastq_gen(fh):
 
-                c, s, q = x[0]
+                c, s, q = x[0]  # header, sequence, quality scores
 
-                # Find the anchor and extract the
-                # cell-specific barcode
+                # First try to identify as ATAC read
                 _bc, _bc_qual, tn5_locs = get_atac_anchors(s, q)
 
                 if _bc is not None:
-
+                    # Process ATAC barcode and check validity
                     _tags, _valid = process_atac_tags(
                         _bc,
                         _bc_qual,
@@ -229,6 +268,7 @@ def _split_multiome_preamp_fastq(
                     if write_only_valid_barcodes and not _valid:
                         continue
 
+                    # Write ATAC read
                     atac_writer(
                         atac_fh,
                         c,
@@ -237,6 +277,7 @@ def _split_multiome_preamp_fastq(
                         **_tags
                     )
 
+                    # Write technical sequence if requested
                     if atac_tech_fh is not None:
                         atac_tech_writer(
                             atac_tech_fh,
@@ -249,10 +290,11 @@ def _split_multiome_preamp_fastq(
                     result_counts[0] += 1
                     continue
 
-                # If the ATAC search failed, check for GEX anchors
+                # If not ATAC, try to identify as GEX read
                 _bc, _umi, gex_locs = get_gex_anchors(s, q)
 
                 if _bc is not None:
+                    # Process GEX barcode and UMI, check validity
                     _tags, _valid = process_gex_tags(
                         _bc[0],
                         _bc[1],
@@ -264,6 +306,7 @@ def _split_multiome_preamp_fastq(
                     if write_only_valid_barcodes and not _valid:
                         continue
 
+                    # Write GEX read
                     gex_writer(
                         gex_fh,
                         c,
@@ -274,7 +317,7 @@ def _split_multiome_preamp_fastq(
                     result_counts[1] += 1
                     continue
 
-                # Put the remains into other
+                # If neither ATAC nor GEX, write to other file
                 other_writer(
                     other_fh,
                     c,
@@ -284,6 +327,7 @@ def _split_multiome_preamp_fastq(
                 result_counts[2] += 1
 
         finally:
+            # Ensure technical file is closed if it was opened
             if atac_tech_fh is not None:
                 atac_tech_fh.close()
 
