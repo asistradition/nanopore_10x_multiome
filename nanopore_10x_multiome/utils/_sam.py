@@ -6,8 +6,8 @@ def sam_comment_to_tag(
 ):
     """Convert SAM comment fields to standard SAM tags.
 
-    Takes comment fields like 'CB=ACGT' and converts them to SAM format tags like 'CB:Z:ACGT'.
-    Handles multiple tag types (CB, CR, CY, UB, UR, UY) for cell barcode and UMI information.
+    Takes comment entries like 'CB=ACGT' and converts them to SAM format tags in the correct
+    positions.
 
     :param sam_file: Path to input SAM file
     :type sam_file: str
@@ -63,10 +63,17 @@ def sam_comment_to_tag(
                     if _tag_loc == -1:
                         continue
 
+                    trailing_comment = _comments[_tag_loc + c_len:]
+
+                    if len(trailing_comment) == 0:
+                        extracted_tag = ''
+                    elif trailing_comment[0] == ' ':
+                        extracted_tag = ''
+                    else:
+                        extracted_tag = trailing_comment.split()[0]
+
                     # Extract value and convert to SAM tag format
-                    _new_tag.append(
-                        tag_pref + _comments[_tag_loc + c_len:].split()[0]
-                    )
+                    _new_tag.append(tag_pref + extracted_tag)
 
                 # Output original line if no tags converted
                 if len(_new_tag) == 0:
