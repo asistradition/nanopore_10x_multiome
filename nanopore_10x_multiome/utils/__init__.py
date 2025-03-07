@@ -10,7 +10,8 @@ from ._fastq import (
 )
 
 from ._bam import (
-    write_bam_record
+    write_bam_record,
+    split_bam_by_barcode
 )
 
 from ._sam import (
