@@ -20,7 +20,8 @@ setup(
       'joblib',
       'parasail',
       'regex',
-      'tqdm'
+      'tqdm',
+      'pysam'
     ],
     zip_safe=True,
     classifiers=[
