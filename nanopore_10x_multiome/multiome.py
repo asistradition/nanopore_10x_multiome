@@ -53,17 +53,17 @@ def split_multiome_preamp_fastq(
     """
     Split multiome pre-amplification FASTQ file(s) into ATAC, GEX and other reads.
 
-    :param in_file_name: Input FASTQ file path
-    :type in_file_name: str
-    :param atac_file_name: Output FASTQ file path for ATAC reads
-    :type atac_file_name: str
-    :param gex_file_name: Output FASTQ file path for GEX reads
-    :type gex_file_name: str
-    :param other_file_name: Output FASTQ file path for unidentified reads
+    :param in_file_name: Input FASTQ file path(s)
+    :type in_file_name: str, list
+    :param atac_file_name: Output FASTQ file path(s) for ATAC reads
+    :type atac_file_name: str, list
+    :param gex_file_name: Output FASTQ file path(s) for GEX reads
+    :type gex_file_name: str, list
+    :param other_file_name: Output FASTQ file path(s) for unidentified reads
         (genomic, too many errors near barcode, etc)
-    :type other_file_name: str
-    :param atac_technical_file_name: Optional output file for ATAC technical sequences
-    :type atac_technical_file_name: str or None
+    :type other_file_name: str, list
+    :param atac_technical_file_name: Optional output file(s) for ATAC technical sequences
+    :type atac_technical_file_name: str, list, or None
     :param n_jobs: Number of parallel processes for joblib, defaults to None
     :type n_jobs: int or None
     :param keep_runoff_fragments: Keep ATAC fragments where the barcode end is intact,
@@ -74,7 +74,7 @@ def split_multiome_preamp_fastq(
     :param verbose: Verbose parameter for joblib.Parallel
     :type verbose: int
 
-    :return: Array of counts [ATAC reads, GEX reads, other reads]
+    :return: Array of counts with n_files x [ATAC reads, GEX reads, other reads]
     :rtype: numpy.ndarray
     """
 
