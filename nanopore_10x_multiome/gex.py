@@ -89,7 +89,7 @@ def process_gex_tags(
         'CY': barcode_quality,
         'UB': umi,
         'UR': umi,
-        'CY': umi_quality
+        'UY': umi_quality
     }
 
     return tags, corrected_barcode is not None

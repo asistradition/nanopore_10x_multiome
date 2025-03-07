@@ -75,3 +75,39 @@ def test_bam_writer():
                 ):
                     assert x[0][1] == y.query_sequence
                     assert x[0][2] == list(y.query_qualities)
+
+
+def test_fastq_writer_tags():
+
+    with tempfile.TemporaryDirectory() as td:
+
+        _tempfile = os.path.join(td, 'temp.fastq')
+        writer = get_file_writer(_tempfile)
+
+        processor = fastqProcessor(
+            verify_ids=False,
+            phred_type='raw'
+        )
+
+        with open(TEST_FILE, mode='r') as fastqfile:
+            with open(_tempfile, mode='w') as outfile:
+                for x in processor.fastq_gen(fastqfile):
+                    c, s, q = x[0]
+
+                    writer(
+                        outfile,
+                        c,
+                        s,
+                        q,
+                        **{'CB': 'ATGC', 'CR': 'ATTC', 'CY': 'II4I'}
+                    )
+
+        with open(TEST_FILE, mode='r') as fastqfile:
+            with open(_tempfile, mode='r') as outfile:
+                for line1, line2 in zip(processor.fastq_gen(outfile), processor.fastq_gen(fastqfile)):
+                    assert line1[0][1] == line2[0][1]
+                    assert line1[0][2] == line2[0][2]
+
+                    assert '\tCB:Z:ATGC' in line1[0][0]
+                    assert '\tCR:Z:ATTC' in line1[0][0]
+                    assert '\tCY:Z:II4I' in line1[0][0]
