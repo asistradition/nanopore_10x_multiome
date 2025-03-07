@@ -108,6 +108,6 @@ def test_fastq_writer_tags():
                     assert line1[0][1] == line2[0][1]
                     assert line1[0][2] == line2[0][2]
 
-                    assert '\tCB:Z:ATGC' in line1[0][0]
-                    assert '\tCR:Z:ATTC' in line1[0][0]
-                    assert '\tCY:Z:II4I' in line1[0][0]
+                    assert ' CB=ATGC' in line1[0][0]
+                    assert ' CR=ATTC' in line1[0][0]
+                    assert ' CY=II4I' in line1[0][0]

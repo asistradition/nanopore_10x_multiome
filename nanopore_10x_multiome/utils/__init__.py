@@ -13,6 +13,10 @@ from ._bam import (
     write_bam_record
 )
 
+from ._sam import (
+    sam_comment_to_tag
+)
+
 from ._sequence import (
     RC,
     REV
