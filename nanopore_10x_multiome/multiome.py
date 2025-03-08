@@ -78,6 +78,7 @@ def split_multiome_preamp_fastq(
     :rtype: numpy.ndarray
     """
 
+    load_missing_multiome_barcode_info(pbar=verbose > 0)
     
     if not isinstance(in_file_name, (tuple, list)):
         return _split_multiome_preamp_fastq(
@@ -89,8 +90,9 @@ def split_multiome_preamp_fastq(
             write_only_valid_barcodes=write_only_valid_barcodes,
             keep_runoff_fragments=keep_runoff_fragments,
         )
-    
-    load_missing_multiome_barcode_info(pbar=verbose > 0)
+
+    if atac_technical_file_name is None:
+        atac_technical_file_name = itertools.repeat(None)
 
     return np.stack([
         r

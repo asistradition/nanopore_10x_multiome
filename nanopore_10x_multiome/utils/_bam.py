@@ -3,7 +3,7 @@ from collections import Counter
 
 import pysam
 import tqdm
-
+import pandas as pd
 
 def write_bam_record(
     handle,
@@ -26,6 +26,38 @@ def write_bam_record(
     ]
 
     handle.write(a)
+
+
+def bam_summarize_barcodes(
+    bam_file,
+    pbar=False,
+    barcode_tag='CB'
+):
+    
+    # Set up progress bar if requested
+    if pbar:
+        iterer = tqdm.tqdm
+    else:
+        def iterer(x, **kwargs):
+            return iter(x)
+
+    with pysam.AlignmentFile(bam_file, "rb") as bamfile:
+        bamlen = bamfile.mapped + bamfile.unmapped
+
+        _data = [
+            (
+                r.get_tag(barcode_tag),
+                len(r.query_sequence),
+                r.is_mapped
+            )
+            for r in iterer(bamfile, total=bamlen)
+        ]
+
+    return pd.DataFrame(
+        _data,
+        columns=['barcode', 'length', 'is_mapped']
+    )
+
 
 
 def split_bam_by_barcode(
